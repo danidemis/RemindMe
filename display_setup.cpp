@@ -51,7 +51,7 @@ void display_setup()
 {
     // Init Display
     gfx->begin();
-    gfx->fillScreen(BLACK);
+    gfx->fillScreen(0x0000); // 0x0000 is Black in RGB565
 
 #ifdef GFX_BL
     pinMode(GFX_BL, OUTPUT);
