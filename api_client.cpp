@@ -1,14 +1,18 @@
 #include "api_client.h"
 #include "config.h"
+#include "settings.h"
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 
 void setup_wifi() {
+    String ssid = get_wifi_ssid();
+    String pass = get_wifi_pass();
+    
     Serial.print("Connecting to Wi-Fi ");
-    Serial.println(WIFI_SSID);
+    Serial.println(ssid);
 
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    WiFi.begin(ssid.c_str(), pass.c_str());
 
     int attempts = 0;
     while (WiFi.status() != WL_CONNECTED && attempts < 20) {
@@ -24,6 +28,37 @@ void setup_wifi() {
     } else {
         Serial.println("\nFailed to connect to Wi-Fi.");
     }
+}
+
+std::vector<String> scan_wifi_networks() {
+    std::vector<String> networks;
+    Serial.println("Scanning Wi-Fi...");
+    int n = WiFi.scanNetworks();
+    for (int i = 0; i < n; i++) {
+        networks.push_back(WiFi.SSID(i));
+    }
+    return networks;
+}
+
+bool connect_new_wifi(const String& ssid, const String& password) {
+    Serial.printf("Connecting to new Wi-Fi: %s\n", ssid.c_str());
+    WiFi.disconnect();
+    WiFi.begin(ssid.c_str(), password.c_str());
+    
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+        delay(500);
+        Serial.print(".");
+        attempts++;
+    }
+    
+    if (WiFi.status() == WL_CONNECTED) {
+        set_wifi_ssid(ssid);
+        set_wifi_pass(password);
+        Serial.println("\nConnected & Saved!");
+        return true;
+    }
+    return false;
 }
 
 bool fetch_events(std::vector<Event>& events_list) {

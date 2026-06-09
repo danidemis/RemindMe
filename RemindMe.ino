@@ -1,12 +1,14 @@
 #include <Arduino.h>
 #include "config.h"
+#include "settings.h"
 #include "event_model.h"
 #include "api_client.h"
 #include "display_setup.h"
 #include "ui.h"
+#include "power_manager.h"
+#include "button_handler.h"
 #include <vector>
 
-// Task handles if using FreeRTOS
 TaskHandle_t fetchTaskHandle = NULL;
 
 std::vector<Event> current_events;
@@ -16,16 +18,17 @@ bool force_fetch = true;
 // A FreeRTOS task to fetch JSON in the background
 void fetch_task(void *pvParameters) {
   while (true) {
-    if (force_fetch || (millis() - last_fetch_time >= FETCH_INTERVAL_MS)) {
+    unsigned long fetch_interval = get_sync_interval_ms();
+    if (force_fetch || (millis() - last_fetch_time >= fetch_interval)) {
       Serial.println("Starting fetch task...");
       bool success = fetch_events(current_events);
       
       if (success) {
-        // Convert to C-arrays to pass to UI
         int count = current_events.size();
-        const char* titles[count];
-        unsigned long times[count];
-        const char* types[count];
+        // VLA (Variable Length Arrays) are standard in GCC
+        const char* titles[count > 0 ? count : 1];
+        unsigned long times[count > 0 ? count : 1];
+        const char* types[count > 0 ? count : 1];
 
         for(int i=0; i<count; i++) {
           titles[i] = current_events[i].title.c_str();
@@ -33,8 +36,6 @@ void fetch_task(void *pvParameters) {
           types[i] = current_events[i].type.c_str();
         }
 
-        // LVGL is not thread-safe by default, 
-        // we should theoretically use a mutex here if display_loop is on another core.
         ui_update_events(titles, times, types, count);
         
         last_fetch_time = millis();
@@ -44,42 +45,55 @@ void fetch_task(void *pvParameters) {
       }
     }
     
-    // Sleep to prevent blocking watchdog
     vTaskDelay(pdMS_TO_TICKS(5000));
   }
 }
 
 void setup() {
   Serial.begin(115200);
-  delay(1000); // Give serial monitor time to open
+  delay(1000);
   
   Serial.println("Starting RemindMe Agenda...");
 
-  // 1. Init Display & LVGL
+  // 1. Init NVS Settings
+  settings_init();
+
+  // 2. Init Power Manager (AXP2101, screen sleep)
+  power_init();
+
+  // 3. Init Buttons
+  button_init();
+
+  // 4. Init Display & LVGL
   display_setup();
 
-  // 2. Init UI
+  // 5. Init UI
   ui_init();
 
-  // 3. Connect to Wi-Fi
+  // 6. Connect to Wi-Fi
   setup_wifi();
 
-  // 4. Create Background Fetch Task
-  // Pin fetch task to Core 0 to leave Core 1 free for LVGL/Loop
+  // 7. Create Background Fetch Task
   xTaskCreatePinnedToCore(
-      fetch_task,       /* Task function. */
-      "FetchTask",      /* String with name of task. */
-      10000,            /* Stack size in bytes. */
-      NULL,             /* Parameter passed as input of the task */
-      1,                /* Priority of the task. */
-      &fetchTaskHandle, /* Task handle. */
-      0);               /* Core where the task should run */
+      fetch_task,
+      "FetchTask",
+      10000,
+      NULL,
+      1,
+      &fetchTaskHandle,
+      0);
 }
 
 void loop() {
-  // Feed LVGL
+  // Process UI
   display_loop();
   
-  // A small delay to let other background processes run
+  // Process buttons
+  button_loop();
+
+  // Process sleep timeouts
+  power_loop();
+  
+  // Small delay to let other processes run
   delay(5);
 }

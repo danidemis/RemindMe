@@ -55,3 +55,36 @@ void ui_update_events(const char** titles, unsigned long* times, const char** ty
         lv_obj_set_style_text_color(btn, lv_color_hex(0xFFFFFF), 0);
     }
 }
+
+static lv_obj_t * alarm_popup = NULL;
+
+static void dismiss_btn_event_cb(lv_event_t * e) {
+    ui_hide_alarm();
+}
+
+void ui_show_alarm(const char* title) {
+    if (alarm_popup != NULL) return; // already showing
+    
+    alarm_popup = lv_obj_create(lv_scr_act());
+    lv_obj_set_size(alarm_popup, 300, 200);
+    lv_obj_center(alarm_popup);
+    lv_obj_set_style_bg_color(alarm_popup, lv_color_hex(0xAA0000), 0);
+    
+    lv_obj_t * label = lv_label_create(alarm_popup);
+    lv_label_set_text_fmt(label, "ALARM!\n%s", title);
+    lv_obj_set_style_text_color(label, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_align(label, LV_ALIGN_TOP_MID, 0, 20);
+    
+    lv_obj_t * dismiss_btn = lv_btn_create(alarm_popup);
+    lv_obj_align(dismiss_btn, LV_ALIGN_BOTTOM_MID, 0, -20);
+    lv_obj_add_event_cb(dismiss_btn, dismiss_btn_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_t * btn_label = lv_label_create(dismiss_btn);
+    lv_label_set_text(btn_label, "Dismiss");
+}
+
+void ui_hide_alarm(void) {
+    if (alarm_popup != NULL) {
+        lv_obj_del(alarm_popup);
+        alarm_popup = NULL;
+    }
+}

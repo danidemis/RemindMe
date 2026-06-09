@@ -11,8 +11,13 @@ extern "C" {
 void ui_init(void);
 
 // Update the list of events shown on the screen
-// We pass arrays since this might be called from C++ but compiled as C
 void ui_update_events(const char** titles, unsigned long* times, const char** types, int count);
+
+// Show the Alarm Popup
+void ui_show_alarm(const char* title);
+
+// Hide the Alarm Popup
+void ui_hide_alarm(void);
 
 #ifdef __cplusplus
 } /* extern "C" */
